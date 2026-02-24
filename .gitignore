@@ -13,3 +13,5 @@ __pycache__/
 *.swp
 .idea/
 .vscode/
+# Ignore task files
+*.task
