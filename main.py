@@ -59,7 +59,6 @@ def main():
 
         # Draw bounding boxes if faces are detected
         draw_bbox(frame0, bbox0, (0, 0, 255), "Cam0 detect")
-        draw_bbox(frame0, projected_bbox0, (255, 0, 0), "Cam1 -> Cam0")
         draw_bbox(frame1, bbox1, (0, 255, 0), "Cam1 detect")
 
         # Combine side by side
