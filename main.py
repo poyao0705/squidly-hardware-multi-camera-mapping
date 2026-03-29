@@ -1,5 +1,26 @@
+# pyright: reportAttributeAccessIssue=false
+
 import cv2
+from bbox_transfer import DEFAULT_R, DEFAULT_T, project_bbox_to_cam2
 from detector import Detector
+
+
+def draw_bbox(frame, bbox, color, label):
+    if bbox is None:
+        return
+
+    x1, y1, x2, y2 = bbox
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+    cv2.putText(
+        frame,
+        label,
+        (x1, max(20, y1 - 8)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        color,
+        2,
+    )
+
 
 def main():
     print("Hello from squidly-hardware-multi-camera-mapping!")
@@ -29,34 +50,47 @@ def main():
         # Detect faces in each frame
         bbox0 = detector0.detect(frame0)
         bbox1 = detector1.detect(frame1)
+        projected_bbox0 = project_bbox_to_cam2(
+            bbox1,
+            R=DEFAULT_R,
+            T=DEFAULT_T,
+            image_shape_cam2=frame0.shape,
+        )
 
         # Draw bounding boxes if faces are detected
-        if bbox0:
-            x1, y1, x2, y2 = bbox0
-            cv2.rectangle(frame0, (x1, y1), (x2, y2), (0, 0, 255), 2)
-        if bbox1:
-            x1, y1, x2, y2 = bbox1
-            cv2.rectangle(frame1, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        draw_bbox(frame0, bbox0, (0, 0, 255), "Cam0 detect")
+        draw_bbox(frame0, projected_bbox0, (255, 0, 0), "Cam1 -> Cam0")
+        draw_bbox(frame1, bbox1, (0, 255, 0), "Cam1 detect")
 
         # Combine side by side
         combined = cv2.hconcat([frame0, frame1])
-        # Pad frame0 to match width of combined
-        frame0_w = frame0.shape[1]
-        _, w = combined.shape[:2]
-        frame0_padded = cv2.copyMakeBorder(frame0, 0, 0, 0, w - frame0_w, cv2.BORDER_CONSTANT, value=0)
 
-        # Draw bbox0 on the left half (frame0 region)
-        if bbox0 is not None:
-            x1, y1, x2, y2 = bbox0
-            cv2.rectangle(frame0_padded, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame0_padded, "Cam0", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-        # Draw bbox1 on the frame0 region (no offset)
-        if bbox1 is not None:
-            x1, y1, x2, y2 = bbox1
-            cv2.rectangle(frame0_padded, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame0_padded, "Cam1", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        
-        v_combined = cv2.vconcat([combined, frame0_padded])
+        projection_view = frame0.copy()
+        cv2.putText(
+            projection_view,
+            "Projection View",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+        )
+        draw_bbox(projection_view, bbox0, (0, 0, 255), "Cam0 detect")
+        draw_bbox(projection_view, projected_bbox0, (255, 0, 0), "Projected from Cam1")
+
+        projection_view_w = projection_view.shape[1]
+        _, w = combined.shape[:2]
+        projection_padded = cv2.copyMakeBorder(
+            projection_view,
+            0,
+            0,
+            0,
+            w - projection_view_w,
+            cv2.BORDER_CONSTANT,
+            value=0,
+        )
+
+        v_combined = cv2.vconcat([combined, projection_padded])
 
         cv2.imshow("Dual Webcam", v_combined)
 
